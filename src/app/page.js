@@ -1,191 +1,135 @@
-<head>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="components.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@editorjs/editorjs@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@editorjs/header@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@editorjs/list@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/editorjs-alert@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/editorjs-drag-drop"></script>
-    <script src="https://cdn.jsdelivr.net/npm/editorjs-undo"></script>
-    <link rel="stylesheet" href="styles.css">
-    <title>DocSpace</title>
-</head>
-<body style="margin: 0px;">
-    <div class="sidebar">
-        <div class="userarea-name">DocSpace</div>
-        <div class="userarea-email"></div>
-        <div class="sidebarpagecreate">Create Page</div>
-        <div class="sidebarpagelist"></div>
-    </div>
-    <div id="mainarea"></div>
-    <!-- <div id="infooverlay">
-        <div id="infooverlaybox"></div>
-    </div> -->
-    <script>
-        var doneinit = false
-        var editor = ""
-        let currentid = null;
-        const { createClient } = supabase
-        const sbc = createClient('https://fzxvknkpfouvjtfxbnkh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6eHZrbmtwZm91dmp0ZnhibmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc5ODQ1MDgsImV4cCI6MjA1MzU2MDUwOH0.jHJFkSetGgkOFfxcSMyWpsY8htPqcAYnw48xfRuoo6k')
-        sbc.auth.getSession()
-            .then(async (res) => {
-                if (res.data.session == null) {
-                    window.location.replace("/docspace/signin.html?callback=" + window.location.toString())
-                } else {
-                    console.log(res)
-                    document.querySelector(".userarea-email").innerHTML = res.data.session.user.email;
-                    reloadsidebar()
-                }
+"use client";
+import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from 'react-markdown';
+
+export default function Home() {
+  const [query, setQuery] = useState("");
+  const [papers, setPapers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const debounceRef = useRef();
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setPapers([]);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetch(`/api/papers?query=${encodeURIComponent(query)}`)
+        .then((res) => {
+          if (!res.ok) throw new Error("API error");
+          return res.json();
         })
+        .then((data) => {
+          console.log("API response:", data); // <-- Add this line
+          setPapers(data.data || []);
+          setLoading(false);
+        })
+        .catch((err) => {
+          setError("Failed to fetch papers");
+          setLoading(false);
+        });
+    }, 500);
+    return () => clearTimeout(debounceRef.current);
+  }, [query]);
 
-        var editorinit = function() {
-            if (!doneinit) {
-                editor = new EditorJS({
-                    holder: 'mainarea',
-                    tools: {
-                        header: Header,
-                        alert: Alert,
-                        list: {
-                            class: EditorjsList,
-                            inlineToolbar: true,
-                            config: {
-                                defaultStyle: 'unordered'
-                            },
-                        },
-                    },
-                    onReady: () => {
-                        new DragDrop(editor);
-                        new Undo({ editor });
-                    }
-                });
-                doneinit = true
-            }
-        }
+  const handleSummaryClick = async (idx, paper) => {
+    // Optionally: set loading state for this paper
+    const res = await fetch("/api/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: paper.title, abstract: paper.abstract, url: paper.url }),
+    });
+    const data = await res.json();
+    // Update the summary for this paper
+    setPapers((prev) =>
+      prev.map((p, i) =>
+        i === idx ? { ...p, summary: data.summary } : p
+      )
+    );
+  };
 
-        var signout = function() {
-            sbc.auth.signOut()
-                .then((res) => {
-                    console.log(res)
-                    window.location.reload()
-                })
-        }
-
-        var loadpage = function(id) {
-            try {
-                savepage(() => {
-                    editorinit()
-                    currentid = id
-                    sbc.from("Pages").select("*").eq("id", id)
-                        .then((res) => {
-                            console.log(res)
-                            editor.render(res.data[0].content)
-                        })
-                })
-            } catch {
-                editorinit()
-                currentid = id
-                sbc.from("Pages").select("*").eq("id", id)
-                    .then((res) => {
-                        console.log(res)
-                        editor.render(res.data[0].content)
-                    })
-            }
-        }
-
-        var reloadsidebar = function() {
-            document.querySelector(".sidebarpagelist").innerHTML = ""
-            sbc.from("Pages").select("*")
-                .then((res) => {
-                    console.log(res)
-                    res.data.forEach(element => {
-                        newdiv = document.createElement("ds-sidebar-pageitem")
-                        // newdiv.classList.add("sidebarpageitem")
-                        newdiv.setAttribute("onclick", "loadpage(" + element.id + ")")
-                        newdiv.setAttribute("docid", element.id)
-                        newdiv.setAttribute("oncontextmenu", "event.preventDefault(); deletepage(" + element.id + ")")
-                        newdiv.innerHTML = element.name
-                        document.querySelector(".sidebarpagelist").append(newdiv)
-                    });
-                })
-        }
-
-        var createpage = function() {
-            editorinit()
-            sbc.from("Pages").insert([{name: prompt("Page Name"), content: {"time": 1738540332650, "blocks": [], "version": "2.31.0-rc.7"}}]).select()
-                .then((res) => {
-                    console.log(res)
-                    currentid = res.data[0].id
-                    reloadsidebar()
-                })
-        }
-
-        var savepage = function(callback) {
-            editor.save()
-                .then((outputData) => {
-                    console.log('Article data: ', outputData)
-                    console.log('Current ID: ', currentid)
-                    if (typeof outputData !== 'object' || Array.isArray(outputData)) {
-                        console.error('Invalid outputData format:', outputData);
-                        return;
-                    }
-                    console.log('Updating page with ID:', currentid, 'with content:', outputData);
-                    sbc.from("Pages").update({ content: outputData })
-                        .eq("id", currentid)
-                        .then((res) => {
-                            console.log('Save response: ', res)
-                            if (res.error) {
-                                console.error('Save error: ', res.error)
-                            } else {
-                                console.log('Update successful:', res.data);
-                                callback()
-                            }
-                        })
-                })
-                .catch((error) => {
-                    console.log('Saving failed: ', error)
-                });
-        }
-
-        var deletepage = function(id) {
-            if (confirm("Are you sure you want to delete this page?")) {
-                sbc.from("Pages").delete().eq("id", id)
-                    .then((res) => {
-                        console.log('Delete response: ', res)
-                        if (res.error) {
-                            console.error('Delete error: ', res.error)
-                        } else {
-                            console.log('Delete successful:', res.data);
-                            reloadsidebar();
-                        }
-                    })
-            }
-        }
-
-        var fetchUpdatedData = function(id) {
-            sbc.from("Pages").select("*").eq("id", id)
-                .then((res) => {
-                    console.log('Fetched updated data: ', res.data);
-                })
-        }
-
-        document.querySelector(".sidebarpagecreate").addEventListener("click", createpage)
-        // document.querySelector(".sidebarpagelist").addEventListener("click", savepage)
-        document.querySelector(".userarea-email").addEventListener("click", signout)
-
-        let hasChanges = false;
-
-        function markAsChanged() {
-            hasChanges = true;
-        }
-
-        document.getElementById("mainarea").addEventListener("input", markAsChanged);
-
-        setInterval(() => {
-            if (hasChanges) {
-                savepage();
-                hasChanges = false;
-            }
-        }, 5000);
-    </script>
-</body>
-</html>
+  return (
+    <div style={{ minHeight: "100vh", background: "#fff", padding: 0, margin: 0 }}>
+      <main style={{ maxWidth: "100vw", margin: "0 auto", padding: "2rem 1rem" }}>
+        <textarea
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Start typing..."
+          spellCheck={false}
+          style={{
+            width: "100%",
+            minHeight: 150,
+            fontSize: 20,
+            padding: 16,
+            borderRadius: 0,
+            marginBottom: 32,
+            resize: "vertical",
+            boxSizing: "border-box",
+            border: 0,
+            outline: "none"
+          }}
+          autoFocus
+        />
+        {loading && <div>Loading recommendations...</div>}
+        {error && <div style={{ color: "red" }}>{error}</div>}
+        {papers.length > 0 && (
+          <div>
+            <h2>Recommended Papers</h2>
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              {papers.map((paper, idx) => (
+                <li
+                  key={paper.paperId}
+                  style={{
+                    marginBottom: 24,
+                    padding: 16,
+                    background: "#fafbfc",
+                  }}
+                >
+                  <a
+                    href={paper.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 18, fontWeight: 600, color: "#0070f3", textDecoration: "none" }}
+                  >
+                    {paper.title}
+                  </a>
+                  <div style={{ fontSize: 15, color: "#555", marginTop: 6 }}>
+                    {paper.authors && paper.authors.length > 0
+                      ? "By " + paper.authors.map((a) => a.name).join(", ")
+                      : "No authors listed"}
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <button
+                      onClick={() => handleSummaryClick(idx, paper)}
+                      style={{
+                        background: "#0070f3",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 6,
+                        padding: "6px 16px",
+                        cursor: "pointer",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Summary
+                    </button>
+                  </div>
+                  {paper.summary && (
+                    <div style={{ marginTop: 10, fontSize: 15, color: "#333", background: "#f3f6fa", padding: 12, borderRadius: 6 }}>
+                      <ReactMarkdown>{paper.summary}</ReactMarkdown>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
