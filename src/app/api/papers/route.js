@@ -5,7 +5,6 @@ import * as cheerio from 'cheerio';
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const query = searchParams.get("query");
-  const minSJR = searchParams.get("minSJR") || "Q1";
   const maxResults = searchParams.get("maxResults") || 10;
   
   if (!query) {
@@ -15,11 +14,7 @@ export async function GET(req) {
   try {
     const allPapers = await scrapeMultipleSources(query, maxResults);
     
-    const filteredPapers = minSJR !== "all" ? 
-      await filterBySJRQuality(allPapers, minSJR) : 
-      allPapers;
-    
-    return NextResponse.json({ data: filteredPapers });
+    return NextResponse.json({ data: allPapers });
   } catch (error) {
     console.error('Scraping error:', error);
     return NextResponse.json({ data: "Error scraping papers" });
@@ -29,41 +24,46 @@ export async function GET(req) {
 async function scrapeMultipleSources(query, maxResults) {
   const papers = [];
   
-  const sources = [
+    const sources = [
     {
       name: 'arXiv',
       url: `https://arxiv.org/search/?query=${encodeURIComponent(query)}&searchtype=all&source=header`,
       parser: parseArxivResults
     },
     {
+        name: 'DOAJ',
+        url: `https://doaj.org/search/articles?q=${encodeURIComponent(query)}`,
+        parser: parseDOAJResults
+    },
+    {
       name: 'PubMed',
       url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(query)}`,
       parser: parsePubMedResults
-    },
-    {
-      name: 'ScienceDirect',
-      url: `https://www.sciencedirect.com/search?query=${encodeURIComponent(query)}`,
-      parser: parseScienceDirectResults
-    },
-    {
-      name: 'IEEE Xplore',
-      url: `https://ieeexplore.ieee.org/search/searchresult.jsp?queryText=${encodeURIComponent(query)}`,
-      parser: parseIEEEResults
     }
   ];
 
   for (const source of sources) {
     try {
       console.log(`Scraping from ${source.name}...`);
-      
-      const response = await axios.get(source.url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-        },
-        timeout: 10000
-      });
+      let response;
+      if (source.isAPI) {
+        response = await axios.get(source.url, {
+          headers: {
+            'X-ELS-APIKey': process.env.SCIENCEDIRECT_API_KEY,
+            'Accept': 'application/json'
+          },
+          timeout: 10000
+        });
+      } else {
+        response = await axios.get(source.url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+          },
+          timeout: 10000
+        });
+      }
       
       if (response.status === 200) {
         const sourcePapers = await source.parser(response.data, query, maxResults);
@@ -72,44 +72,16 @@ async function scrapeMultipleSources(query, maxResults) {
       }
     } catch (error) {
       console.error(`Error scraping ${source.name}:`, error.message);
+      if (error.response) {
+        console.error(`Status: ${error.response.status}`);
+        console.error(`Response data:`, error.response.data);
+      }
     }
   }
 
   return papers;
 }
 
-async function filterBySJRQuality(papers, minSJR) {
-  const sjrData = await getSJRData();
-  const filteredPapers = [];
-  
-  for (const paper of papers) {
-    try {
-      const issn = extractISSN(paper);
-      
-      if (issn && sjrData[issn]) {
-        const sjrQuintile = sjrData[issn].quintile;
-        const sjrScore = sjrData[issn].score;
-        
-        if (isQualityPaper(sjrQuintile, minSJR)) {
-          paper.sjrData = {
-            quintile: sjrQuintile,
-            score: sjrScore,
-            journal: sjrData[issn].journal
-          };
-          filteredPapers.push(paper);
-        }
-      } else {
-        paper.sjrData = { quintile: 'Unknown', score: 0, journal: 'Unknown' };
-        filteredPapers.push(paper);
-      }
-    } catch (error) {
-      console.error('Error filtering paper:', error);
-      filteredPapers.push(paper);
-    }
-  }
-  
-  return filteredPapers;
-}
 
 function extractISSN(paper) {
   const url = paper.url || '';
@@ -123,29 +95,6 @@ function extractISSN(paper) {
   if (textIssnMatch) return textIssnMatch[1];
   
   return null;
-}
-
-function isQualityPaper(sjrQuintile, minSJR) {
-  const quintileOrder = { 'Q1': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4, 'Q5': 5 };
-  const minQuintile = quintileOrder[minSJR] || 1;
-  const paperQuintile = quintileOrder[sjrQuintile] || 5;
-  
-  return paperQuintile <= minQuintile;
-}
-
-async function getSJRData() {
-  return {
-    '0001-0782': { quintile: 'Q1', score: 2.5, journal: 'Communications of the ACM' },
-    '0018-9162': { quintile: 'Q1', score: 3.2, journal: 'Computer' },
-    '0163-6804': { quintile: 'Q2', score: 1.8, journal: 'IEEE Communications Magazine' },
-    '1041-4347': { quintile: 'Q1', score: 2.9, journal: 'IEEE Transactions on Knowledge and Data Engineering' },
-    '1558-2256': { quintile: 'Q1', score: 3.1, journal: 'IEEE Transactions on Pattern Analysis and Machine Intelligence' },
-    '0360-0300': { quintile: 'Q1', score: 4.2, journal: 'ACM Computing Surveys' },
-    '0004-5411': { quintile: 'Q1', score: 2.8, journal: 'Journal of the ACM' },
-    '0010-4620': { quintile: 'Q2', score: 1.5, journal: 'The Computer Journal' },
-    '0167-8191': { quintile: 'Q1', score: 2.3, journal: 'Parallel Computing' },
-    '0743-7315': { quintile: 'Q2', score: 1.7, journal: 'Journal of Parallel and Distributed Computing' }
-  };
 }
 
 async function parseArxivResults(html, query, maxResults) {
@@ -169,7 +118,6 @@ async function parseArxivResults(html, query, maxResults) {
           const href = urlElement.attr('href');
           url = href.startsWith('http') ? href : `https://arxiv.org${href}`;
         }
-        
         papers.push({
           paperId: Math.random().toString(36).substr(2, 9),
           title,
@@ -185,7 +133,6 @@ async function parseArxivResults(html, query, maxResults) {
   } catch (error) {
     console.error('Error parsing arXiv results:', error);
   }
-  
   return papers;
 }
 
@@ -200,15 +147,21 @@ async function parsePubMedResults(html, query, maxResults) {
       try {
         const $element = $(element);
         
-        const title = $element.find('h1, .title, .result-title').text().trim() || 'No title';
-        const authors = $element.find('.authors-list, .authors, .result-authors').text().trim() || 'No authors';
-        const abstract = $element.find('.abstract, .summary, .result-abstract').text().trim() || 'No abstract';
+        const title = $element.find('h1, .title, .result-title, .docsum-title, .title-link, a[href*="/pubmed/"]').text().trim() || 'No title';
+        const authors = $element.find('.authors-list, .authors, .result-authors, .docsum-authors, .authors-short, .contributors').text().trim() || 'No authors';
+        const abstract = $element.find('.abstract, .summary, .result-abstract, .docsum-snippet, .snippet').text().trim() || 'No abstract';
         
-        const urlElement = $element.find('a[href*="/pubmed/"]').first();
         let url = '#';
-        if (urlElement.length) {
-          const href = urlElement.attr('href');
+        const urlElement = $element.find('a[href*="/pubmed/"], a[href*="pubmed.ncbi.nlm.nih.gov"], .title-link a, .docsum-title a, a').first();
+
+        const href = urlElement.attr('href');
+        if (href && href !== '#') {
           url = href.startsWith('http') ? href : `https://pubmed.ncbi.nlm.nih.gov${href}`;
+        } else {
+          const pmidMatch = $element.html().match(/pubmed\/(\d+)/);
+          if (pmidMatch) {
+             url = `https://pubmed.ncbi.nlm.nih.gov/${pmidMatch[1]}/`;
+          }
         }
         
         papers.push({
@@ -230,67 +183,33 @@ async function parsePubMedResults(html, query, maxResults) {
   return papers;
 }
 
-async function parseScienceDirectResults(html, query, maxResults) {
-  const papers = [];
-  const $ = cheerio.load(html);
-  
-  try {
-    $('.ResultItem, .search-result').each((index, element) => {
-      if (index >= maxResults) return false;
-      
-      try {
-        const $element = $(element);
-        
-        const title = $element.find('.title-text, .result-title').text().trim() || 'No title';
-        const authors = $element.find('.author, .result-authors').text().trim() || 'No authors';
-        const abstract = $element.find('.abstract-text, .result-abstract').text().trim() || 'No abstract';
-        
-        const urlElement = $element.find('a[href*="/science/article/"]').first();
-        let url = '#';
-        if (urlElement.length) {
-          const href = urlElement.attr('href');
-          url = href.startsWith('http') ? href : `https://www.sciencedirect.com${href}`;
-        }
-        
-        papers.push({
-          paperId: Math.random().toString(36).substr(2, 9),
-          title,
-          authors: [{ name: authors }],
-          abstract,
-          url,
-          source: 'ScienceDirect'
-        });
-      } catch (e) {
-        console.error('Error parsing ScienceDirect result element:', e);
-      }
-    });
-  } catch (error) {
-    console.error('Error parsing ScienceDirect results:', error);
-  }
-  
-  return papers;
-}
 
-async function parseIEEEResults(html, query, maxResults) {
+
+async function parseDOAJResults(html, query, maxResults) {
   const papers = [];
   const $ = cheerio.load(html);
   
   try {
-    $('.List-results, .search-result, .result-item').each((index, element) => {
-      if (index >= maxResults) return false;
+    $('.search-results').each((index, element) => {
       
       try {
         const $element = $(element);
         
-        const title = $element.find('.title, .result-title').text().trim() || 'No title';
-        const authors = $element.find('.authors, .result-authors').text().trim() || 'No authors';
-        const abstract = $element.find('.description, .result-abstract').text().trim() || 'No abstract';
+                 const title = $element.find('.search-results__heading a, .title, .article-title, a, h3, h4').text().trim() || 'No title';
+         
+         // Extract authors from li elements within inlined-list
+         const authorElements = $element.find('.inlined-list li');
+         const authors = authorElements.length > 0 
+           ? authorElements.map((i, el) => $(el).text().trim()).get().join(', ')
+           : 'No authors';
+         
+         const abstract = $element.find('.abstract, .description, .summary, .snippet, .collapse doaj-public-search-abstracttext doaj-public-search-abstracttext-results in').text().trim() || 'No abstract';
         
-        const urlElement = $element.find('a[href*="/document/"]').first();
+                 const urlElement = $element.find('.search-results__heading a, a[href*="/article/"], a[href*="/publication/"], a[href*="/document/"]').first();
         let url = '#';
         if (urlElement.length) {
           const href = urlElement.attr('href');
-          url = href.startsWith('http') ? href : `https://ieeexplore.ieee.org${href}`;
+          url = href.startsWith('http') ? href : `https://doaj.org${href}`;
         }
         
         papers.push({
@@ -299,14 +218,14 @@ async function parseIEEEResults(html, query, maxResults) {
           authors: [{ name: authors }],
           abstract,
           url,
-          source: 'IEEE Xplore'
+          source: 'DOAJ'
         });
       } catch (e) {
-        console.error('Error parsing IEEE result element:', e);
+        console.error('Error parsing DOAJ result element:', e);
       }
     });
   } catch (error) {
-    console.error('Error parsing IEEE results:', error);
+    console.error('Error parsing DOAJ results:', error);
   }
   
   return papers;
