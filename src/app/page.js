@@ -25,7 +25,7 @@ export default function Home() {
           return res.json();
         })
         .then((data) => {
-          console.log("API response:", data); // <-- Add this line
+          console.log("API response:", data);
           setPapers(data.data || []);
           setLoading(false);
         })
@@ -38,14 +38,12 @@ export default function Home() {
   }, [query]);
 
   const handleSummaryClick = async (idx, paper) => {
-    // Optionally: set loading state for this paper
     const res = await fetch("/api/summary", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: paper.title, abstract: paper.abstract, url: paper.url }),
     });
     const data = await res.json();
-    // Update the summary for this paper
     setPapers((prev) =>
       prev.map((p, i) =>
         i === idx ? { ...p, summary: data.summary } : p
