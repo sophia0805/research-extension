@@ -5,18 +5,16 @@ import * as cheerio from 'cheerio';
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const query = searchParams.get("query");
-  const minSJR = searchParams.get("minSJR") || "Q1"; // Default to Q1 journals only
-  const maxResults = searchParams.get("maxResults") || 10; // Maximum number of results
+  const minSJR = searchParams.get("minSJR") || "Q1";
+  const maxResults = searchParams.get("maxResults") || 10;
   
   if (!query) {
     return NextResponse.json({ data: [] });
   }
 
   try {
-    // Use advanced scraping with axios and cheerio
     const allPapers = await scrapeMultipleSources(query, maxResults);
     
-    // Filter papers by SJR quality if requested
     const filteredPapers = minSJR !== "all" ? 
       await filterBySJRQuality(allPapers, minSJR) : 
       allPapers;
@@ -31,7 +29,6 @@ export async function GET(req) {
 async function scrapeMultipleSources(query, maxResults) {
   const papers = [];
   
-  // Reliable academic sources to scrape
   const sources = [
     {
       name: 'arXiv',
@@ -87,14 +84,12 @@ async function filterBySJRQuality(papers, minSJR) {
   
   for (const paper of papers) {
     try {
-      // Extract ISSN from paper URL or metadata
       const issn = extractISSN(paper);
       
       if (issn && sjrData[issn]) {
         const sjrQuintile = sjrData[issn].quintile;
         const sjrScore = sjrData[issn].score;
         
-        // Check if paper meets quality threshold
         if (isQualityPaper(sjrQuintile, minSJR)) {
           paper.sjrData = {
             quintile: sjrQuintile,
@@ -104,13 +99,11 @@ async function filterBySJRQuality(papers, minSJR) {
           filteredPapers.push(paper);
         }
       } else {
-        // If no SJR data, include paper but mark it
         paper.sjrData = { quintile: 'Unknown', score: 0, journal: 'Unknown' };
         filteredPapers.push(paper);
       }
     } catch (error) {
       console.error('Error filtering paper:', error);
-      // Include paper even if filtering fails
       filteredPapers.push(paper);
     }
   }
@@ -119,16 +112,13 @@ async function filterBySJRQuality(papers, minSJR) {
 }
 
 function extractISSN(paper) {
-  // Try to extract ISSN from various sources
   const url = paper.url || '';
   const abstract = paper.abstract || '';
   const title = paper.title || '';
   
-  // Look for ISSN pattern in URL
   const urlIssnMatch = url.match(/issn[=:]\s*(\d{4}-\d{3}[\dX])/i);
   if (urlIssnMatch) return urlIssnMatch[1];
   
-  // Look for ISSN pattern in abstract or title
   const textIssnMatch = (abstract + ' ' + title).match(/\b\d{4}-\d{3}[\dX]\b/);
   if (textIssnMatch) return textIssnMatch[1];
   
@@ -144,8 +134,6 @@ function isQualityPaper(sjrQuintile, minSJR) {
 }
 
 async function getSJRData() {
-  // In a real implementation, you would load this from a CSV file
-  // For now, we'll use a simplified version with some sample data
   return {
     '0001-0782': { quintile: 'Q1', score: 2.5, journal: 'Communications of the ACM' },
     '0018-9162': { quintile: 'Q1', score: 3.2, journal: 'Computer' },
@@ -165,9 +153,8 @@ async function parseArxivResults(html, query, maxResults) {
   const $ = cheerio.load(html);
   
   try {
-    // Find all arXiv result items
     $('.arxiv-result').each((index, element) => {
-      if (index >= maxResults) return false; // Stop after maxResults
+      if (index >= maxResults) return false;
       
       try {
         const $element = $(element);
@@ -176,9 +163,12 @@ async function parseArxivResults(html, query, maxResults) {
         const authors = $element.find('.authors').text().trim() || 'No authors';
         const abstract = $element.find('.abstract-full').text().trim() || 'No abstract';
         
-        // Get the paper URL
         const urlElement = $element.find('a[href*="/abs/"]').first();
-        const url = urlElement.length ? `https://arxiv.org${urlElement.attr('href')}` : '#';
+        let url = '#';
+        if (urlElement.length) {
+          const href = urlElement.attr('href');
+          url = href.startsWith('http') ? href : `https://arxiv.org${href}`;
+        }
         
         papers.push({
           paperId: Math.random().toString(36).substr(2, 9),
@@ -204,9 +194,8 @@ async function parsePubMedResults(html, query, maxResults) {
   const $ = cheerio.load(html);
   
   try {
-    // Find all PubMed article items
     $('article, .result-item').each((index, element) => {
-      if (index >= maxResults) return false; // Stop after maxResults
+      if (index >= maxResults) return false;
       
       try {
         const $element = $(element);
@@ -215,9 +204,12 @@ async function parsePubMedResults(html, query, maxResults) {
         const authors = $element.find('.authors-list, .authors, .result-authors').text().trim() || 'No authors';
         const abstract = $element.find('.abstract, .summary, .result-abstract').text().trim() || 'No abstract';
         
-        // Get the paper URL
         const urlElement = $element.find('a[href*="/pubmed/"]').first();
-        const url = urlElement.length ? `https://pubmed.ncbi.nlm.nih.gov${urlElement.attr('href')}` : '#';
+        let url = '#';
+        if (urlElement.length) {
+          const href = urlElement.attr('href');
+          url = href.startsWith('http') ? href : `https://pubmed.ncbi.nlm.nih.gov${href}`;
+        }
         
         papers.push({
           paperId: Math.random().toString(36).substr(2, 9),
@@ -243,9 +235,8 @@ async function parseScienceDirectResults(html, query, maxResults) {
   const $ = cheerio.load(html);
   
   try {
-    // Find all ScienceDirect result items
     $('.ResultItem, .search-result').each((index, element) => {
-      if (index >= maxResults) return false; // Stop after maxResults
+      if (index >= maxResults) return false;
       
       try {
         const $element = $(element);
@@ -254,9 +245,12 @@ async function parseScienceDirectResults(html, query, maxResults) {
         const authors = $element.find('.author, .result-authors').text().trim() || 'No authors';
         const abstract = $element.find('.abstract-text, .result-abstract').text().trim() || 'No abstract';
         
-        // Get the paper URL
         const urlElement = $element.find('a[href*="/science/article/"]').first();
-        const url = urlElement.length ? `https://www.sciencedirect.com${urlElement.attr('href')}` : '#';
+        let url = '#';
+        if (urlElement.length) {
+          const href = urlElement.attr('href');
+          url = href.startsWith('http') ? href : `https://www.sciencedirect.com${href}`;
+        }
         
         papers.push({
           paperId: Math.random().toString(36).substr(2, 9),
@@ -282,9 +276,8 @@ async function parseIEEEResults(html, query, maxResults) {
   const $ = cheerio.load(html);
   
   try {
-    // Find all IEEE result items
     $('.List-results, .search-result, .result-item').each((index, element) => {
-      if (index >= maxResults) return false; // Stop after maxResults
+      if (index >= maxResults) return false;
       
       try {
         const $element = $(element);
@@ -293,9 +286,12 @@ async function parseIEEEResults(html, query, maxResults) {
         const authors = $element.find('.authors, .result-authors').text().trim() || 'No authors';
         const abstract = $element.find('.description, .result-abstract').text().trim() || 'No abstract';
         
-        // Get the paper URL
         const urlElement = $element.find('a[href*="/document/"]').first();
-        const url = urlElement.length ? `https://ieeexplore.ieee.org${urlElement.attr('href')}` : '#';
+        let url = '#';
+        if (urlElement.length) {
+          const href = urlElement.attr('href');
+          url = href.startsWith('http') ? href : `https://ieeexplore.ieee.org${href}`;
+        }
         
         papers.push({
           paperId: Math.random().toString(36).substr(2, 9),

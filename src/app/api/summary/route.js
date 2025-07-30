@@ -7,7 +7,7 @@ export async function POST(req) {
         },
         {
             role: 'user',
-            content: `Summarize the following paper:\nTitle: ${title}\n${abstract ? `Abstract: ${abstract}\n` : ''}${url ? `URL: ${url}` : ''}. Don't include your thinking`
+            content: `Summarize the following paper:\nTitle: ${title}\n${abstract ? `Abstract: ${abstract}\n` : ''}${url ? `URL: ${url}` : ''}. Don't include your thinking. Make it easy to understand and somewhat concise.`
         }
     ];
     try {
