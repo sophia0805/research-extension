@@ -24,7 +24,9 @@ export async function POST(req) {
             throw new Error('AI API error');
         }
         const data = await response.json();
-        const summary = data.choices?.[0]?.message?.content || "No summary available.";
+        let summary = data.choices?.[0]?.message?.content || "No summary available.";
+        summary = summary.replace(/<think>.*?<\/think>/gs, '').trim();
+        
         return Response.json({ summary });
     } catch (err) {
         return Response.json({ summary: "Failed to generate summary." }, { status: 500 });

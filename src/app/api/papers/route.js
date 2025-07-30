@@ -31,11 +31,6 @@ async function scrapeMultipleSources(query, maxResults) {
       parser: parseArxivResults
     },
     {
-        name: 'DOAJ',
-        url: `https://doaj.org/search/articles?q=${encodeURIComponent(query)}`,
-        parser: parseDOAJResults
-    },
-    {
       name: 'PubMed',
       url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(query)}`,
       parser: parsePubMedResults
@@ -80,21 +75,6 @@ async function scrapeMultipleSources(query, maxResults) {
   }
 
   return papers;
-}
-
-
-function extractISSN(paper) {
-  const url = paper.url || '';
-  const abstract = paper.abstract || '';
-  const title = paper.title || '';
-  
-  const urlIssnMatch = url.match(/issn[=:]\s*(\d{4}-\d{3}[\dX])/i);
-  if (urlIssnMatch) return urlIssnMatch[1];
-  
-  const textIssnMatch = (abstract + ' ' + title).match(/\b\d{4}-\d{3}[\dX]\b/);
-  if (textIssnMatch) return textIssnMatch[1];
-  
-  return null;
 }
 
 async function parseArxivResults(html, query, maxResults) {
@@ -178,54 +158,6 @@ async function parsePubMedResults(html, query, maxResults) {
     });
   } catch (error) {
     console.error('Error parsing PubMed results:', error);
-  }
-  
-  return papers;
-}
-
-
-
-async function parseDOAJResults(html, query, maxResults) {
-  const papers = [];
-  const $ = cheerio.load(html);
-  
-  try {
-    $('.search-results').each((index, element) => {
-      
-      try {
-        const $element = $(element);
-        
-                 const title = $element.find('.search-results__heading a, .title, .article-title, a, h3, h4').text().trim() || 'No title';
-         
-         // Extract authors from li elements within inlined-list
-         const authorElements = $element.find('.inlined-list li');
-         const authors = authorElements.length > 0 
-           ? authorElements.map((i, el) => $(el).text().trim()).get().join(', ')
-           : 'No authors';
-         
-         const abstract = $element.find('.abstract, .description, .summary, .snippet, .collapse doaj-public-search-abstracttext doaj-public-search-abstracttext-results in').text().trim() || 'No abstract';
-        
-                 const urlElement = $element.find('.search-results__heading a, a[href*="/article/"], a[href*="/publication/"], a[href*="/document/"]').first();
-        let url = '#';
-        if (urlElement.length) {
-          const href = urlElement.attr('href');
-          url = href.startsWith('http') ? href : `https://doaj.org${href}`;
-        }
-        
-        papers.push({
-          paperId: Math.random().toString(36).substr(2, 9),
-          title,
-          authors: [{ name: authors }],
-          abstract,
-          url,
-          source: 'DOAJ'
-        });
-      } catch (e) {
-        console.error('Error parsing DOAJ result element:', e);
-      }
-    });
-  } catch (error) {
-    console.error('Error parsing DOAJ results:', error);
   }
   
   return papers;
