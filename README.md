@@ -1,9 +1,9 @@
 psa: for some reason wakatime decided to tweak out so here are my other hackatime projects:
 
-- https://hackatime-badge.hackclub.com/U074B2Y4ANL/welcome
-- https://hackatime-badge.hackclub.com/U074B2Y4ANL/research-extension
+- https://hackatime-badge.hackclub.com/U074B2Y4ANL/welcome | ![](https://hackatime-badge.hackclub.com/U074B2Y4ANL/welcome)
+- https://hackatime-badge.hackclub.com/U074B2Y4ANL/research-extension | ![](https://hackatime-badge.hackclub.com/U074B2Y4ANL/research-extension)
 
-# researcher
+# researcher  | [![Athena Award Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Faward.athena.hackclub.com%2Fapi%2Fbadge)](https://award.athena.hackclub.com?utm_source=readme)
 
 finds research papers related to the topic in your notes by web scraping different academic databases
 > inspired by my ap seminar-traumatized friends (a class which involves doing a lot of research on topics) and my desire to procrastinate my summer hw
@@ -46,4 +46,4 @@ I struggled a lot with discovering how to web scrape specific academic databases
 ![](https://hc-cdn.hel1.your-objectstorage.com/s/v3/444ae8f012535ac80328e447c5c0b88b10611a34_image.png)
 ![](https://hc-cdn.hel1.your-objectstorage.com/s/v3/2af74a6b7edeb08c517c81fa8f4a55f8e52974b4_image.png)
 ### finished project:
-![](https://hc-cdn.hel1.your-objectstorage.com/s/v3/53a81dc698495ee42c0bed09c4b41631e4bd9bbe_image.png)
+![](https://hc-cdn.hel1.your-objectstorage.com/s/v3/0065f099a982d3ba51dfb95cebe0de344fe0d4db_image.png) 

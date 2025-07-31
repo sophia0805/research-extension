@@ -8,6 +8,7 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1);
   const [editingName, setEditingName] = useState("");
   const [phrases, setPhrases] = useState([]);
+  const [bookmarks, setBookmarks] = useState([]);
   const debounceRef = useRef();
 
   const currentPageData = pages.find((page) => page.id === currentPage);
@@ -50,7 +51,6 @@ export default function Home() {
       setPhrases([]);
       return;
     }
-    
     setLoading(true);
     clearTimeout(debounceRef.current);
 
@@ -115,6 +115,19 @@ export default function Home() {
         page.id === currentPage ? { ...page, content } : page
       )
     );
+  };
+
+  const toggleBookmark = (paper) => {
+    const isBookmarked = bookmarks.some(b => b.paperId === paper.paperId);
+    if (isBookmarked) {
+      setBookmarks(bookmarks.filter(b => b.paperId !== paper.paperId));
+    } else {
+      setBookmarks([...bookmarks, { ...paper, bookmarkedAt: new Date().toISOString() }]);
+    }
+  };
+
+  const isBookmarked = (paper) => {
+    return bookmarks.some(b => b.paperId === paper.paperId);
   };
 
   const deletePage = () => {
@@ -235,6 +248,53 @@ export default function Home() {
                 </div>
               ))}
             </div>
+            {bookmarks.length > 0 && (
+              <div style={{ marginTop: "2rem" }}>
+                <div style={{ marginBottom: "1rem" }}>
+                  <span style={{ fontWeight: 500 }}>Bookmarks ({bookmarks.length})</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {bookmarks.slice(0, 5).map((bookmark) => (
+                    <div
+                      key={bookmark.paperId}
+                      style={{
+                        padding: "0.5rem",
+                        background: "#fff",
+                        borderRadius: "4px",
+                        border: "1px solid #e0e0e0",
+                        fontSize: "0.75rem",
+                      }}
+                    >
+                      <a
+                        href={bookmark.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: "#0070f3",
+                          textDecoration: "none",
+                          fontWeight: "500",
+                          display: "block",
+                          marginBottom: "0.25rem",
+                        }}
+                      >
+                        {bookmark.title.length > 50 
+                          ? bookmark.title.substring(0, 50) + "..." 
+                          : bookmark.title
+                        }
+                      </a>
+                      <div style={{ color: "#666", fontSize: "0.7rem" }}>
+                        {bookmark.source}
+                      </div>
+                    </div>
+                  ))}
+                  {bookmarks.length > 5 && (
+                    <div style={{ fontSize: "0.7rem", color: "#666", textAlign: "center" }}>
+                      +{bookmarks.length - 5} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
         </div>
       </div>
       <div style={{ flex: 1, background: "#fff", padding: "2rem" }}>
@@ -310,7 +370,6 @@ export default function Home() {
             </div>
           </div>
         )}
-        
         {loading && <div style={{ marginTop: "1rem", color: "#666" }}>Loading recommendations...</div>}
       </div>
       <div style={{ width: 400, background: "#f8f9fa", padding: "1.5rem", overflowY: "auto" }}>
@@ -342,22 +401,38 @@ export default function Home() {
                   <div style={{ fontSize: "0.75rem", color: "#666", marginBottom: "0.5rem" }}>
                     {paper.authors?.length ? paper.authors.map((a) => a.name).join(", ") : "No authors listed"}
                   </div>
-                  <button
-                    onClick={() => summarizePaper(idx, paper)}
-                    style={{
-                      background: "#0070f3",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 4,
-                      padding: "0.5rem 1rem",
-                      cursor: "pointer",
-                      fontWeight: 500,
-                      fontSize: "0.75rem",
-                      float: "right",
-                    }}
-                  >
-                    Summary
-                  </button>
+                                      <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                      <button
+                        onClick={() => toggleBookmark(paper)}
+                        style={{
+                          background: isBookmarked(paper) ? "#ff6b6b" : "#f0f0f0",
+                          color: isBookmarked(paper) ? "#fff" : "#333",
+                          border: "none",
+                          borderRadius: 4,
+                          padding: "0.5rem 0.75rem",
+                          cursor: "pointer",
+                          fontWeight: 500,
+                          fontSize: "0.75rem",
+                        }}
+                      >
+                        {isBookmarked(paper) ? "★" : "☆"}
+                      </button>
+                      <button
+                        onClick={() => summarizePaper(idx, paper)}
+                        style={{
+                          background: "#0070f3",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 4,
+                          padding: "0.5rem 1rem",
+                          cursor: "pointer",
+                          fontWeight: 500,
+                          fontSize: "0.75rem",
+                        }}
+                      >
+                        Summary
+                      </button>
+                    </div>
                   {paper.summary && (
                     <div
                       style={{

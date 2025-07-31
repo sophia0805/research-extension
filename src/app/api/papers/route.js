@@ -18,7 +18,6 @@ export async function GET(req) {
 
 async function scrapeMultipleSources(query, selectedSources, maxResults) {
   const papers = [];
-  
   const allSources = [
     {
       name: 'arxiv',
