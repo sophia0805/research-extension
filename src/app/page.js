@@ -7,10 +7,20 @@ export default function Home() {
   const [pages, setPages] = useState([{ id: 1, name: "Page 1", content: "" }]);
   const [currentPage, setCurrentPage] = useState(1);
   const [editingName, setEditingName] = useState("");
-  const [extractedPhrases, setExtractedPhrases] = useState([]);
+  const [phrases, setPhrases] = useState([]);
   const debounceRef = useRef();
 
   const currentPageData = pages.find((page) => page.id === currentPage);
+
+  const highlight = (text, phrases) => {
+    if (!text || !phrases || phrases.length === 0) return text;
+    let highlightedText = text;
+    phrases.forEach(phrase => {
+      const regex = new RegExp(`(${phrase.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      highlightedText = highlightedText.replace(regex, '<mark style="background-color: #ffeb3b; padding: 2px 4px; border-radius: 3px;">$1</mark>');
+    });
+    return highlightedText;
+  };
 
   const extractPhrases = async (content) => {
     if (!content.trim()) return [];
@@ -37,7 +47,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentPageData?.content?.trim()) {
       setPapers([]);
-      setExtractedPhrases([]);
+      setPhrases([]);
       return;
     }
     
@@ -46,7 +56,7 @@ export default function Home() {
 
     debounceRef.current = setTimeout(async () => {
       const phrases = await extractPhrases(currentPageData.content);
-      setExtractedPhrases(phrases);
+      setPhrases(phrases);
       if (phrases.length === 0) {
         setPapers([]);
         setLoading(false);
@@ -228,31 +238,61 @@ export default function Home() {
         </div>
       </div>
       <div style={{ flex: 1, background: "#fff", padding: "2rem" }}>
-        <textarea
-          value={currentPageData?.content || ""}
-          onChange={(e) => updatePage(e.target.value)}
-          placeholder="Start typing..."
-          spellCheck={false}
-          style={{
-            width: "100%",
-            minHeight: 200,
-            fontSize: "1rem",
-            padding: "1rem",
-            resize: "vertical",
-            lineHeight: 1.5,
-            border: 0,
-            outline: "none",
-            fontFamily: "inherit",
-          }}
-          autoFocus
-        />
-        {extractedPhrases.length > 0 && (
+        <div style={{ position: "relative" }}>
+          <textarea
+            value={currentPageData?.content || ""}
+            onChange={(e) => updatePage(e.target.value)}
+            placeholder="Start typing..."
+            spellCheck={false}
+            style={{
+              width: "100%",
+              minHeight: "50vh",
+              fontSize: "1rem",
+              padding: "1rem",
+              resize: "vertical",
+              lineHeight: 1.5,
+              border: 0,
+              outline: "none",
+              fontFamily: "inherit",
+              color: "transparent",
+              caretColor: "black",
+              background: "transparent",
+              position: "relative",
+              zIndex: 2,
+            }}
+            autoFocus
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              padding: "1rem",
+              fontSize: "1rem",
+              lineHeight: 1.5,
+              fontFamily: "inherit",
+              pointerEvents: "none",
+              whiteSpace: "pre-wrap",
+              wordWrap: "break-word",
+              zIndex: 1,
+              overflow: "hidden",
+            }}
+            dangerouslySetInnerHTML={{
+              __html: currentPageData?.content 
+                ? highlight(currentPageData.content, phrases)
+                : ""
+            }}
+          />
+        </div>
+        {phrases.length > 0 && (
           <div style={{ marginTop: "1rem", padding: "0.75rem", background: "#f8f9fa", borderRadius: "4px" }}>
             <div style={{ fontSize: "0.875rem", fontWeight: "500", marginBottom: "0.5rem", color: "#333" }}>
               Searching based on these phrases:
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-              {extractedPhrases.map((phrase, index) => (
+              {phrases.map((phrase, index) => (
                 <span
                   key={index}
                   style={{
