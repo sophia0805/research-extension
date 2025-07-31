@@ -5,6 +5,7 @@ import * as cheerio from 'cheerio';
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const query = searchParams.get("query");
+  const sources = searchParams.get("sources") || "arxiv,pubmed";
   const maxResults = searchParams.get("maxResults") || 10;
   
   if (!query) {
@@ -12,7 +13,7 @@ export async function GET(req) {
   }
 
   try {
-    const allPapers = await scrapeMultipleSources(query, maxResults);
+    const allPapers = await scrapeMultipleSources(query, sources.split(','), maxResults);
     
     return NextResponse.json({ data: allPapers });
   } catch (error) {
@@ -21,21 +22,26 @@ export async function GET(req) {
   }
 }
 
-async function scrapeMultipleSources(query, maxResults) {
+async function scrapeMultipleSources(query, selectedSources, maxResults) {
   const papers = [];
   
-    const sources = [
+  const allSources = [
     {
-      name: 'arXiv',
+      name: 'arxiv',
+      displayName: 'arXiv',
       url: `https://arxiv.org/search/?query=${encodeURIComponent(query)}&searchtype=all&source=header`,
       parser: parseArxivResults
     },
     {
-      name: 'PubMed',
+      name: 'pubmed',
+      displayName: 'PubMed',
       url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(query)}`,
       parser: parsePubMedResults
     }
   ];
+
+  // Filter sources based on selectedSources
+  const sources = allSources.filter(source => selectedSources.includes(source.name));
 
   for (const source of sources) {
     try {
@@ -63,10 +69,10 @@ async function scrapeMultipleSources(query, maxResults) {
       if (response.status === 200) {
         const sourcePapers = await source.parser(response.data, query, maxResults);
         papers.push(...sourcePapers);
-        console.log(`Found ${sourcePapers.length} papers from ${source.name}`);
+        console.log(`Found ${sourcePapers.length} papers from ${source.displayName}`);
       }
     } catch (error) {
-      console.error(`Error scraping ${source.name}:`, error.message);
+      console.error(`Error scraping ${source.displayName}:`, error.message);
       if (error.response) {
         console.error(`Status: ${error.response.status}`);
         console.error(`Response data:`, error.response.data);
