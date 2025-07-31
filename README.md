@@ -6,7 +6,7 @@ psa: for some reason wakatime decided to tweak out so here are my other hackatim
 # researcher
 
 finds research papers related to the topic in your notes by web scraping different academic databases
-- inspired by my ap seminar-traumatized friends (a class which involves doing a lot of research on topics) and my desire to procrastinate my summer hw
+> inspired by my ap seminar-traumatized friends (a class which involves doing a lot of research on topics) and my desire to procrastinate my summer hw
 
 ## features
 - uses AI to identify the most important research phrases from your notes
@@ -20,10 +20,25 @@ finds research papers related to the topic in your notes by web scraping differe
 3. relevant papers appear in the right side bar
 4. click on a paper or generate a summary!
 
-## Deploy on Vercel
+## installation
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/sophia0805/research-extension
+   cd research-extension
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. **Run the development server**
+   ```bash
+   npm run dev
+   ```
 
+4. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
 
+## history
+I struggled a lot with discovering how to web scrape specific academic databases, since it was something I hadn't previously explored. Some of the sites I initially tried to use (such as science direct) had prevention in place so I just cut them out/replaced them with other sites.
