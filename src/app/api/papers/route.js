@@ -12,14 +12,8 @@ export async function GET(req) {
     return NextResponse.json({ data: [] });
   }
 
-  try {
-    const allPapers = await scrapeMultipleSources(query, sources.split(','), maxResults);
-    
-    return NextResponse.json({ data: allPapers });
-  } catch (error) {
-    console.error('Scraping error:', error);
-    return NextResponse.json({ data: "Error scraping papers" });
-  }
+  const allPapers = await scrapeMultipleSources(query, sources.split(','), maxResults);
+  return NextResponse.json({ data: allPapers });
 }
 
 async function scrapeMultipleSources(query, selectedSources, maxResults) {
@@ -41,7 +35,6 @@ async function scrapeMultipleSources(query, selectedSources, maxResults) {
   ];
 
   const sources = allSources.filter(source => selectedSources.includes(source.name));
-
   for (const source of sources) {
     console.log(`Scraping from ${source.name}...`);
     let response;
