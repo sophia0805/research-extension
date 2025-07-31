@@ -40,7 +40,6 @@ async function scrapeMultipleSources(query, selectedSources, maxResults) {
     }
   ];
 
-  // Filter sources based on selectedSources
   const sources = allSources.filter(source => selectedSources.includes(source.name));
 
   for (const source of sources) {
