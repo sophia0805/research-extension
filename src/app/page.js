@@ -14,7 +14,6 @@ export default function Home() {
 
   const extractPhrases = async (content) => {
     if (!content.trim()) return [];
-  
     const res = await fetch("/api/extract-phrases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
