@@ -4,38 +4,76 @@ import { useState, useEffect, useRef } from "react";
 export default function Home() {
   const [papers, setPapers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [pages, setPages] = useState([{ id: 1, name: "Page 1", content: "" }]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingPage, setEditingPage] = useState(null);
   const [editingName, setEditingName] = useState("");
+  const [extractedPhrases, setExtractedPhrases] = useState([]);
   const debounceRef = useRef();
 
   const currentPageData = pages.find((page) => page.id === currentPage);
 
+  const extractPhrases = async (content) => {
+    if (!content.trim()) return [];
+  
+    const res = await fetch("/api/extract-phrases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    const data = await res.json();
+      
+    if (data.phrases && data.phrases.length > 0) {
+      return data.phrases.map(phrase => {
+        const start = content.indexOf(phrase);
+        return {
+          text: phrase,
+          start: start >= 0 ? start : 0,
+          end: start >= 0 ? start + phrase.length : phrase.length
+        };
+      });
+    }
+    return [];
+  };
+
   useEffect(() => {
     if (!currentPageData?.content?.trim()) {
       setPapers([]);
-      setError(null);
+      setExtractedPhrases([]);
       return;
     }
+    
     setLoading(true);
-    setError(null);
     clearTimeout(debounceRef.current);
 
     debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/papers?query=${encodeURIComponent(currentPageData.content)}`);
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        setPapers(data.data || []);
-      } catch {
-        setError("Failed to fetch papers");
-      } finally {
+      const phrases = await extractPhrases(currentPageData.content);
+      setExtractedPhrases(phrases);
+      if (phrases.length === 0) {
+        setPapers([]);
         setLoading(false);
+        return;
       }
+      const allPapers = [];
+      for (const phrase of phrases) {
+        const res = await fetch(`/api/papers?query=${encodeURIComponent(phrase.text)}`);
+        const data = await res.json();
+        if (data.data && data.data.length > 0) {
+          const papersWithSource = data.data.map(paper => ({
+            ...paper,
+            source: paper.source || 'Unknown',
+            searchPhrase: phrase.text
+          }));
+          allPapers.push(...papersWithSource);
+        }
+      }
+        
+      const uniquePapers = allPapers.filter((paper, index, self) => 
+        index === self.findIndex(p => p.paperId === paper.paperId || p.url === paper.url)
+      );
+        
+      setPapers(uniquePapers);
+      setLoading(false);
     }, 500);
-
     return () => clearTimeout(debounceRef.current);
   }, [currentPageData?.content]);
 
@@ -78,20 +116,18 @@ export default function Home() {
     }
   };
 
-  const editPage = (pageId, currentName) => {
-    setEditingPage(pageId);
+  const editPage = (currentName) => {
     setEditingName(currentName);
   };
 
   const savePage = () => {
     if (editingName.trim()) {
       setPages(pages.map(page => 
-        page.id === editingPage 
+        page.id === currentPage 
           ? { ...page, name: editingName.trim() } 
           : page
       ));
     }
-    setEditingPage(null);
     setEditingName("");
   };
 
@@ -99,7 +135,6 @@ export default function Home() {
     if (event.key === 'Enter') {
       savePage();
     } else if (event.key === 'Escape') {
-      setEditingPage(null);
       setEditingName("");
     }
   };
@@ -151,7 +186,7 @@ export default function Home() {
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               {pages.map((page) => (
                 <div key={page.id}>
-                  {editingPage === page.id ? (
+                  {editingName !== "" && page.id === currentPage ? (
                     <input
                       type="text"
                       value={editingName}
@@ -172,7 +207,7 @@ export default function Home() {
                   ) : (
                     <button
                       onClick={() => setCurrentPage(page.id)}
-                      onDoubleClick={() => editPage(page.id, page.name)}
+                      onDoubleClick={() => editPage(page.name)}
                       style={{
                         padding: "0.5rem 1rem",
                         background: page.id === currentPage ? "#0070f3" : "transparent",
@@ -212,8 +247,32 @@ export default function Home() {
           }}
           autoFocus
         />
+        {extractedPhrases.length > 0 && (
+          <div style={{ marginTop: "1rem", padding: "0.75rem", background: "#f8f9fa", borderRadius: "4px" }}>
+            <div style={{ fontSize: "0.875rem", fontWeight: "500", marginBottom: "0.5rem", color: "#333" }}>
+              Searching based on these phrases:
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+              {extractedPhrases.map((phrase, index) => (
+                <span
+                  key={index}
+                  style={{
+                    background: "#ffeb3b",
+                    padding: "0.25rem 0.5rem",
+                    borderRadius: "3px",
+                    fontSize: "0.75rem",
+                    fontWeight: "500",
+                    color: "#333"
+                  }}
+                >
+                  {phrase.text}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        
         {loading && <div style={{ marginTop: "1rem", color: "#666" }}>Loading recommendations...</div>}
-        {error && <div style={{ marginTop: "1rem", color: "#dc2626" }}>{error}</div>}
       </div>
       <div style={{ width: 400, background: "#f8f9fa", padding: "1.5rem", overflowY: "auto" }}>
         {papers.length > 0 && (
@@ -241,7 +300,7 @@ export default function Home() {
                   >
                     {paper.title}
                   </a>
-                  <div style={{ fontSize: "0.75rem", color: "#666", marginBottom: "0.75rem" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#666", marginBottom: "0.5rem" }}>
                     {paper.authors?.length ? paper.authors.map((a) => a.name).join(", ") : "No authors listed"}
                   </div>
                   <button

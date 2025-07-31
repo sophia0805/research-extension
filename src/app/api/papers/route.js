@@ -6,7 +6,7 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const query = searchParams.get("query");
   const sources = searchParams.get("sources") || "arxiv,pubmed";
-  const maxResults = searchParams.get("maxResults") || 10;
+  const maxResults = searchParams.get("maxResults") || 3;
   
   if (!query) {
     return NextResponse.json({ data: [] });
