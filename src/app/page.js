@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 
 export default function Home() {
-  const [query, setQuery] = useState("");
   const [papers, setPapers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -40,7 +39,7 @@ export default function Home() {
     return () => clearTimeout(debounceRef.current);
   }, [currentPageData?.content]);
 
-  const handleSummaryClick = async (idx, paper) => {
+  const summarizePaper = async (idx, paper) => {
     const res = await fetch("/api/summary", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -63,7 +62,7 @@ export default function Home() {
     setCurrentPage(newPageId);
   };
 
-  const updatePageContent = (content) => {
+  const updatePage = (content) => {
     setPages(
       pages.map((page) =>
         page.id === currentPage ? { ...page, content } : page
@@ -79,12 +78,12 @@ export default function Home() {
     }
   };
 
-  const startEditingPage = (pageId, currentName) => {
+  const editPage = (pageId, currentName) => {
     setEditingPage(pageId);
     setEditingName(currentName);
   };
 
-  const savePageName = () => {
+  const savePage = () => {
     if (editingName.trim()) {
       setPages(pages.map(page => 
         page.id === editingPage 
@@ -96,9 +95,9 @@ export default function Home() {
     setEditingName("");
   };
 
-  const handlePageNameKeyDown = (event) => {
+  const renamePage = (event) => {
     if (event.key === 'Enter') {
-      savePageName();
+      savePage();
     } else if (event.key === 'Escape') {
       setEditingPage(null);
       setEditingName("");
@@ -106,7 +105,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const keyDown = (event) => {
       if (event.key === 'Delete' || event.key === 'Backspace') {
         if (event.target.tagName !== 'TEXTAREA' && event.target.tagName !== 'INPUT') {
           deletePage();
@@ -114,8 +113,8 @@ export default function Home() {
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', keyDown);
+    return () => document.removeEventListener('keydown', keyDown);
   }, [currentPage, pages]);
 
   return (
@@ -157,8 +156,8 @@ export default function Home() {
                       type="text"
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
-                      onKeyDown={handlePageNameKeyDown}
-                      onBlur={savePageName}
+                      onKeyDown={renamePage}
+                      onBlur={savePage}
                       style={{
                         width: "100%",
                         padding: "0.5rem 1rem",
@@ -173,7 +172,7 @@ export default function Home() {
                   ) : (
                     <button
                       onClick={() => setCurrentPage(page.id)}
-                      onDoubleClick={() => startEditingPage(page.id, page.name)}
+                      onDoubleClick={() => editPage(page.id, page.name)}
                       style={{
                         padding: "0.5rem 1rem",
                         background: page.id === currentPage ? "#0070f3" : "transparent",
@@ -197,7 +196,7 @@ export default function Home() {
       <div style={{ flex: 1, background: "#fff", padding: "2rem" }}>
         <textarea
           value={currentPageData?.content || ""}
-          onChange={(e) => updatePageContent(e.target.value)}
+          onChange={(e) => updatePage(e.target.value)}
           placeholder="Start typing..."
           spellCheck={false}
           style={{
@@ -246,7 +245,7 @@ export default function Home() {
                     {paper.authors?.length ? paper.authors.map((a) => a.name).join(", ") : "No authors listed"}
                   </div>
                   <button
-                    onClick={() => handleSummaryClick(idx, paper)}
+                    onClick={() => summarizePaper(idx, paper)}
                     style={{
                       background: "#0070f3",
                       color: "#fff",
