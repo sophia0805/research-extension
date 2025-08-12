@@ -26,9 +26,7 @@ export async function POST(req) {
     });
 
     let fixedResponse = await response.json()
-    fixedResponse = fixedResponse.choices[0]?.message?.content
-    .replace(/<think>[\s\S]*?<\/think>/g, '') // [\s\S] matches absolutely anything, including newlines
-    .trim();
+    fixedResponse = fixedResponse.choices[0]?.message?.content.replace(/<think>.*?<\/think>/gs, '').trim();
     let phrases;
 
     console.log(fixedResponse);
