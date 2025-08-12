@@ -31,7 +31,7 @@ export default function Home() {
       body: JSON.stringify({ content }),
     });
     const data = await res.json();
-      
+    
     if (data.phrases && data.phrases.length > 0) {
       return data.phrases.map(phrase => {
         const start = content.indexOf(phrase);

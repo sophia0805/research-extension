@@ -1,32 +1,42 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(req) {
-  const { content } = await req.json();
-  const response = await fetch("https://ai.hackclub.com/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert research assistant. Extract the 3 most important 4-6 word phrases from the given research content that would be most effective for finding relevant academic papers. Specific research topics or methodologies and terms that would appear in paper titles or abstracts
-          Return ONLY a JSON array of exactly 3 phrases, ordered by importance (most important first). Make sure the phrases are directly from the content and not generated. If there are fewer than 4 words, that is acceptable too.`
-        },
-        {
-          role: "user",
-          content: `Extract the 3 most important research phrases from this content: ${content} Return only the JSON array of phrases.`
-        }
-      ],
-      temperature: 0.1,
-      max_tokens: 300
+  try {
+    const { content } = await req.json();
+    const response = await fetch("https://ai.hackclub.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Extract exactly 3 phrases from the given content. Return ONLY a JSON array like ["phrase1", "phrase2", "phrase3"].`
+          },
+          {
+            role: "user",
+            content: `Content: ${content}\n\nExtract 3 phrases and return as JSON array:`
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 300
       })
     });
 
-    let fixedResponse = await response.json()
-    fixedResponse = fixedResponse.choices[0]?.message?.content.replace(/<think>.*?<\/think>/gs, '').trim();
+    if (!response.ok) {
+      throw new Error(`AI service responded with status ${response.status}`);
+    }
+
+    let initialResponse = await response.json()
+    console.log(initialResponse);
+    
+    if (!initialResponse.choices || !initialResponse.choices[0]?.message?.content) {
+      throw new Error('AI service returned unexpected response format');
+    }
+    
+    const fixedResponse = initialResponse.choices[0].message.content.replace(/<think>.*?<\/think>/gs, '').trim();
     let phrases;
 
     console.log(fixedResponse);
@@ -40,13 +50,22 @@ export async function POST(req) {
         throw new Error("Could not parse AI response as JSON");
       }
     }
+    
     const topPhrases = phrases.slice(0, 3).filter(phrase => 
       typeof phrase === 'string' && phrase.trim().length > 0
     );
-
+    
+    console.log(phrases);
     return NextResponse.json({ 
       phrases: topPhrases,
       count: topPhrases.length
     });
 
-} 
+  } catch (error) {
+    console.error('Error in extract-phrases API:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to extract phrases' },
+      { status: 500 }
+    );
+  }
+}
