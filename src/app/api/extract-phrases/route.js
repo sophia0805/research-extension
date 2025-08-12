@@ -13,7 +13,7 @@ export async function POST(req) {
         {
           role: "system",
           content: `You are an expert research assistant. Extract the 3 most important 4-6 word phrases from the given research content that would be most effective for finding relevant academic papers. Specific research topics or methodologies and terms that would appear in paper titles or abstracts
-          Return ONLY a JSON array of exactly 3 phrases, ordered by importance (most important first). Make sure the phrases are directly from the content and not generated.`
+          Return ONLY a JSON array of exactly 3 phrases, ordered by importance (most important first). Make sure the phrases are directly from the content and not generated. If there are fewer than 4 words, that is acceptable too.`
         },
         {
           role: "user",
@@ -26,7 +26,9 @@ export async function POST(req) {
     });
 
     let fixedResponse = await response.json()
-    fixedResponse = fixedResponse.choices[0]?.message?.content.replace(/<think>.*?<\/think>/gs, '').trim();
+    fixedResponse = fixedResponse.choices[0]?.message?.content
+    .replace(/<think>[\s\S]*?<\/think>/g, '') // [\s\S] matches absolutely anything, including newlines
+    .trim();
     let phrases;
 
     console.log(fixedResponse);
@@ -48,4 +50,5 @@ export async function POST(req) {
       phrases: topPhrases,
       count: topPhrases.length
     });
+
 } 
